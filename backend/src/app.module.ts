@@ -11,6 +11,7 @@ import { SaleStatusesModule } from './modules/sale-statuses/sale-statuses.module
 import { TechnologiesModule } from './modules/technologies/technologies.module';
 import { GoalsModule } from './modules/goals/goals.module';
 import { NotificationsModule } from './modules/notifications/notifications.module';
+import { GatewaysModule } from './modules/gateways/gateways.module';
 
 @Module({
   imports: [
@@ -26,6 +27,7 @@ import { NotificationsModule } from './modules/notifications/notifications.modul
     TechnologiesModule,
     GoalsModule,
     NotificationsModule,
+    GatewaysModule,
   ],
   controllers: [AppController],
   providers: [AppService],
