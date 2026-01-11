@@ -109,9 +109,7 @@ class WebSocketService {
                     auth: { token: connectToken },
                     transports: ['websocket', 'polling'],
                     autoConnect,
-                    reconnection: true,
-                    reconnectionAttempts: this.maxReconnectAttempts,
-                    reconnectionDelay: this.reconnectDelay,
+                    reconnection: false, // Disable built-in reconnection - handle it ourselves
                 });
 
                 this.setupEventHandlers();
@@ -251,23 +249,6 @@ class WebSocketService {
      */
     private setupEventHandlers(): void {
         if (!this.socket) return;
-
-        // Reconexión
-        this.socket.io.on('reconnect', (attempt) => {
-            console.log(`[WebSocket] Reconnected after ${attempt} attempts`);
-        });
-
-        this.socket.io.on('reconnect_attempt', (attempt) => {
-            console.log(`[WebSocket] Reconnection attempt ${attempt}`);
-        });
-
-        this.socket.io.on('reconnect_error', (error) => {
-            console.error('[WebSocket] Reconnection error:', error);
-        });
-
-        this.socket.io.on('reconnect_failed', () => {
-            console.error('[WebSocket] Reconnection failed');
-        });
 
         // Notificaciones
         this.socket.on('notification', (data: WebSocketNotification) => {
