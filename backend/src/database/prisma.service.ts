@@ -3,17 +3,26 @@ import { PrismaClient } from '@prisma/client';
 
 @Injectable()
 export class PrismaService extends PrismaClient implements OnModuleInit, OnModuleDestroy {
-  async onModuleInit() {
-    await this.$connect();
+  constructor() {
+    super();
+    this.setupMiddleware();
+  }
 
+  private setupMiddleware() {
     // Middleware para soft deletes automáticos
-    this['$use'](async (params, next) => {
+    const modelsWithSoftDelete = ['User', 'Sale', 'Company', 'SaleStatus', 'Technology'];
+    const hasDeletedAt = (model: string | undefined): boolean => {
+      if (!model) return false;
+      return modelsWithSoftDelete.includes(model);
+    };
+
+    (this as any).$use(async (params: any, next: (params: any) => Promise<any>) => {
       // Convertir DELETE en UPDATE con deletedAt
       if (params.action === 'delete') {
         params.action = 'update';
         params.args['data'] = { deletedAt: new Date() };
       }
-      
+
       if (params.action === 'deleteMany') {
         params.action = 'updateMany';
         if (params.args.data !== undefined) {
@@ -22,11 +31,10 @@ export class PrismaService extends PrismaClient implements OnModuleInit, OnModul
           params.args['data'] = { deletedAt: new Date() };
         }
       }
-      
+
       // Filtrar registros eliminados en queries de lectura
       if (params.action === 'findUnique' || params.action === 'findFirst') {
-        // Solo aplicar si el modelo tiene el campo deletedAt (User, Sale, etc.)
-        if (this.hasDeletedAt(params.model)) {
+        if (hasDeletedAt(params.model)) {
           params.action = 'findFirst';
           params.args.where = {
             ...params.args.where,
@@ -34,10 +42,9 @@ export class PrismaService extends PrismaClient implements OnModuleInit, OnModul
           };
         }
       }
-      
+
       if (params.action === 'findMany') {
-        if (this.hasDeletedAt(params.model)) {
-          // Solo agregar filtro si no se especificó deletedAt explícitamente
+        if (hasDeletedAt(params.model)) {
           if (params.args.where) {
             if (params.args.where.deletedAt === undefined) {
               params.args.where['deletedAt'] = null;
@@ -47,10 +54,9 @@ export class PrismaService extends PrismaClient implements OnModuleInit, OnModul
           }
         }
       }
-      
-      // Actualizar también en count
+
       if (params.action === 'count') {
-        if (this.hasDeletedAt(params.model)) {
+        if (hasDeletedAt(params.model)) {
           if (params.args.where) {
             if (params.args.where.deletedAt === undefined) {
               params.args.where['deletedAt'] = null;
@@ -60,9 +66,13 @@ export class PrismaService extends PrismaClient implements OnModuleInit, OnModul
           }
         }
       }
-      
+
       return next(params);
     });
+  }
+
+  async onModuleInit() {
+    await this.$connect();
   }
 
   async onModuleDestroy() {
