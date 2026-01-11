@@ -1,8 +1,0 @@
-[phases.setup]
-nixPkgs = ["nodejs-22_x"]
-
-[phases.build]
-nixPkgs = ["nodejs-22_x"]
-
-[phases.start]
-nixPkgs = ["nodejs-22_x"]
