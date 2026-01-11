@@ -6,7 +6,9 @@ import {
     ConnectedSocket,
     OnGatewayConnection,
     OnGatewayDisconnect,
+    OnGatewayInit,
 } from '@nestjs/websockets';
+import { Logger } from '@nestjs/common';
 import { Server, Socket } from 'socket.io';
 
 @WebSocketGateway({
@@ -15,11 +17,16 @@ import { Server, Socket } from 'socket.io';
     },
     transports: ['websocket', 'polling'],
 })
-export class NotificationsGateway implements OnGatewayConnection, OnGatewayDisconnect {
+export class NotificationsGateway implements OnGatewayInit, OnGatewayConnection, OnGatewayDisconnect {
     @WebSocketServer()
     server: Server;
 
+    private readonly logger = new Logger(NotificationsGateway.name);
     private connectedUsers = new Map<string, string>(); // socketId -> userId
+
+    afterInit(server: Server) {
+        this.logger.log('WebSocket Gateway initialized successfully');
+    }
 
     async handleConnection(client: Socket) {
         const userId = client.handshake.query.userId as string;
