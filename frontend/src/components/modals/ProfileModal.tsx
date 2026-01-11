@@ -2,10 +2,12 @@ import React, { useEffect, useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
-import { X, User, Lock, Save, Loader2 } from 'lucide-react';
+import { X, User as UserIcon, Lock, Save, Loader2 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import api from '../../services/api';
 import { useQueryClient } from '@tanstack/react-query';
+import { useUserData } from '../../hooks/use-user-data';
+import type { User } from '../../types';
 
 const profileSchema = z.object({
     firstName: z.string().min(2, 'El nombre es muy corto'),
@@ -30,7 +32,7 @@ interface ProfileModalProps {
 }
 
 const ProfileModal: React.FC<ProfileModalProps> = ({ isOpen, onClose }) => {
-    const user = JSON.parse(localStorage.getItem('user') || '{}');
+    const { user, refresh } = useUserData();
     const [isLoading, setIsLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [success, setSuccess] = useState(false);
@@ -39,15 +41,15 @@ const ProfileModal: React.FC<ProfileModalProps> = ({ isOpen, onClose }) => {
     const { register, handleSubmit, reset, formState: { errors } } = useForm<ProfileFormData>({
         resolver: zodResolver(profileSchema),
         defaultValues: {
-            firstName: user.firstName || '',
-            lastName: user.lastName || '',
+            firstName: user?.firstName || '',
+            lastName: user?.lastName || '',
             password: '',
             confirmPassword: '',
         }
     });
 
     useEffect(() => {
-        if (isOpen) {
+        if (isOpen && user) {
             reset({
                 firstName: user.firstName || '',
                 lastName: user.lastName || '',
@@ -57,13 +59,19 @@ const ProfileModal: React.FC<ProfileModalProps> = ({ isOpen, onClose }) => {
             setSuccess(false);
             setError(null);
         }
-    }, [isOpen, reset, user.firstName, user.lastName]);
+    }, [isOpen, reset, user?.firstName, user?.lastName, user]);
 
     const onSubmit = async (data: ProfileFormData) => {
+        if (!user) return;
+
         setIsLoading(true);
         setError(null);
         try {
-            const updateData: any = {
+            const updateData: {
+                firstName: string;
+                lastName: string;
+                password?: string;
+            } = {
                 firstName: data.firstName,
                 lastName: data.lastName,
             };
@@ -77,12 +85,16 @@ const ProfileModal: React.FC<ProfileModalProps> = ({ isOpen, onClose }) => {
             const updatedUser = { ...user, firstName: data.firstName, lastName: data.lastName };
             localStorage.setItem('user', JSON.stringify(updatedUser));
 
+            // Refresh the hook data
+            refresh();
+
             setSuccess(true);
             setTimeout(() => {
                 onClose();
             }, 1500);
-        } catch (err: any) {
-            setError(err.response?.data?.message || 'Error al actualizar el perfil');
+        } catch (err: unknown) {
+            const error = err as { response?: { data?: { message?: string } } };
+            setError(error.response?.data?.message || 'Error al actualizar el perfil');
         } finally {
             setIsLoading(false);
         }
@@ -110,7 +122,7 @@ const ProfileModal: React.FC<ProfileModalProps> = ({ isOpen, onClose }) => {
                         <div className="p-6 border-b border-slate-800 flex items-center justify-between">
                             <div className="flex items-center gap-3">
                                 <div className="p-2 bg-brand-500/10 rounded-xl text-brand-500">
-                                    <User size={20} />
+                                    <UserIcon size={20} />
                                 </div>
                                 <h2 className="text-xl font-bold text-white">Mi Perfil</h2>
                             </div>

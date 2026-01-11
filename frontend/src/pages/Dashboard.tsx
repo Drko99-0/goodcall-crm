@@ -28,48 +28,63 @@ import goalsService from '../services/goals.service';
 import saleStatusesService from '../services/sale-statuses.service';
 import SalesFormModal from '../components/modals/SalesFormModal';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { websocketService } from '../services/websocket.service';
+import { websocketService, SaleUpdatePayload } from '../services/websocket.service';
+import type { GoalUpdatePayload } from '../types';
+import { useUserData } from '../hooks/use-user-data';
+import type { Sale, Goal, SaleStatus } from '../types';
 
 const Dashboard: React.FC = () => {
     const queryClient = useQueryClient();
-    const user = JSON.parse(localStorage.getItem('user') || '{}');
+    const { user } = useUserData();
     const [isModalOpen, setIsModalOpen] = React.useState(false);
     const [realtimeUpdate, setRealtimeUpdate] = useState<Date | null>(null);
     const now = new Date();
     const startDate = startOfMonth(now).toISOString();
     const endDate = endOfMonth(now).toISOString();
 
-    const { data: sales, isLoading: loadingSales } = useQuery({
-        queryKey: ['sales', 'dashboard', user.id],
+    const { data: sales, isLoading: loadingSales } = useQuery<Sale[] | { data: Sale[] }>({
+        queryKey: ['sales', 'dashboard', user?.id],
         queryFn: () => salesService.getAll({
-            asesorId: user.role === 'asesor' ? user.id : undefined, // Si es admin, quizás quiera ver todo? Por ahora filtremos por el usuario si es asesor
+            asesorId: user?.role === 'asesor' ? user.id : undefined, // Si es admin, quizás quiera ver todo? Por ahora filtremos por el usuario si es asesor
             startDate,
             endDate
-        })
+        }),
+        enabled: !!user
     });
 
-    const { data: goals, isLoading: loadingGoals } = useQuery({
-        queryKey: ['goals', 'dashboard', user.id],
+    const { data: goals, isLoading: loadingGoals } = useQuery<Goal[]>({
+        queryKey: ['goals', 'dashboard', user?.id],
         queryFn: () => goalsService.getAll({
-            userId: user.id,
+            userId: user?.id,
             year: now.getFullYear(),
             month: now.getMonth() + 1 // 0-indexed en JS
-        })
+        }),
+        enabled: !!user
     });
 
-    const totalSales = sales?.length || 0;
-    const activeSales = sales?.filter((s: any) => s.saleStatus?.code !== 'CANC').length || 0;
+    const { data: statuses } = useQuery<SaleStatus[]>({
+        queryKey: ['statuses'],
+        queryFn: saleStatusesService.getAll
+    });
+
+    // Normalize sales data - it can be either an array or an object with data property
+    const salesArray = Array.isArray(sales) ? sales : (sales as { data?: Sale[] })?.data || [];
+    const totalSales = salesArray.length || 0;
+    const activeSales = salesArray.filter((s: Sale) => s.saleStatus?.code !== 'CANC').length || 0;
     const currentGoal = goals?.[0]?.targetSales || 0;
     const goalProgress = currentGoal > 0 ? Math.min(Math.round((activeSales / currentGoal) * 100), 100) : 0;
 
     // --- WebSocket para actualizaciones en tiempo real ---
     useEffect(() => {
+        if (!user) return;
+
         // Conectar al WebSocket
         websocketService.connect().catch(console.error);
 
         // Escuchar actualizaciones de ventas
-        const handleSaleUpdate = (data: any) => {
-            if (data.event === 'sale_update') {
+        const handleSaleUpdate = (data: unknown) => {
+            const saleUpdate = data as SaleUpdatePayload;
+            if (saleUpdate.event === 'sale_update') {
                 console.log('Actualización en tiempo real:', data);
                 setRealtimeUpdate(new Date());
                 // Invalidar y refrescar queries
@@ -78,8 +93,9 @@ const Dashboard: React.FC = () => {
         };
 
         // Escuchar actualizaciones de metas
-        const handleGoalUpdate = (data: any) => {
-            if (data.event === 'goal_update') {
+        const handleGoalUpdate = (data: unknown) => {
+            const goalUpdate = data as GoalUpdatePayload;
+            if (goalUpdate.event === 'goal_update') {
                 console.log('Meta actualizada:', data);
                 setRealtimeUpdate(new Date());
                 queryClient.invalidateQueries({ queryKey: ['goals'] });
@@ -94,34 +110,40 @@ const Dashboard: React.FC = () => {
             websocketService.off('sale_update', handleSaleUpdate);
             websocketService.off('goal_update', handleGoalUpdate);
         };
-    }, [queryClient]);
+    }, [queryClient, user]);
 
     // --- Data Processing for Charts ---
-    const { data: statuses } = useQuery({ queryKey: ['statuses'], queryFn: saleStatusesService.getAll });
-
     const daysInMonth = eachDayOfInterval({ start: startOfMonth(now), end: endOfMonth(now) });
 
     const salesByDayData = daysInMonth.map(day => {
-        const daySales = sales?.filter((s: any) => isSameDay(new Date(s.saleDate), day)) || [];
+        const daySales = salesArray.filter((s: Sale) => isSameDay(new Date(s.saleDate), day)) || [];
         return {
             name: format(day, 'dd'),
             date: format(day, 'dd/MM'),
             total: daySales.length,
-            active: daySales.filter((s: any) => s.saleStatus?.code !== 'CANC').length
+            active: daySales.filter((s: Sale) => s.saleStatus?.code !== 'CANC').length
         };
     });
 
-    const salesByStatusData = statuses?.map((status: any) => ({
+    const salesByStatusData = statuses?.map((status: SaleStatus) => ({
         name: status.name,
-        value: sales?.filter((s: any) => s.saleStatusId === status.id).length || 0,
+        value: salesArray.filter((s: Sale) => s.saleStatusId === status.id).length || 0,
         color: status.color
-    })).filter((s: any) => s.value > 0) || [];
+    })).filter((s: { value: number }) => s.value > 0) || [];
 
     const stats = [
         { label: 'Ventas Totales', value: loadingSales ? '...' : totalSales.toString(), icon: TrendingUp, color: 'text-emerald-500' },
         { label: 'Ventas Activas', value: loadingSales ? '...' : activeSales.toString(), icon: LayoutDashboard, color: 'text-brand-500' },
         { label: 'Meta Mensual', value: loadingGoals ? '...' : currentGoal.toString(), icon: Users, color: 'text-amber-500' }
     ];
+
+    if (!user) {
+        return (
+            <div className="flex items-center justify-center min-h-screen bg-slate-950">
+                <div className="animate-spin h-8 w-8 border-2 border-brand-500 border-t-transparent rounded-full"></div>
+            </div>
+        );
+    }
 
     return (
         <div className="space-y-6">
@@ -275,7 +297,7 @@ const Dashboard: React.FC = () => {
                                     paddingAngle={5}
                                     dataKey="value"
                                 >
-                                    {salesByStatusData.map((entry: any, index: number) => (
+                                    {salesByStatusData.map((entry: { color: string }, index: number) => (
                                         <Cell key={`cell-${index}`} fill={entry.color} />
                                     ))}
                                 </Pie>
@@ -286,7 +308,7 @@ const Dashboard: React.FC = () => {
                         </ResponsiveContainer>
                     </div>
                     <div className="mt-4 space-y-2">
-                        {salesByStatusData.map((status: any, index: number) => (
+                        {salesByStatusData.map((status: { name: string; value: number; color: string }, index: number) => (
                             <div key={index} className="flex items-center justify-between text-xs">
                                 <div className="flex items-center gap-2">
                                     <div className="w-2 h-2 rounded-full" style={{ backgroundColor: status.color }} />
@@ -303,7 +325,7 @@ const Dashboard: React.FC = () => {
                 <h2 className="text-xl font-bold text-white mb-4">Actividad Reciente</h2>
                 {loadingSales ? (
                     <div className="text-slate-400">Cargando datos...</div>
-                ) : sales?.length === 0 ? (
+                ) : salesArray.length === 0 ? (
                     <div className="h-64 flex flex-col items-center justify-center border-2 border-dashed border-slate-800 rounded-xl text-slate-500">
                         <p>No hay ventas registradas este mes.</p>
                         <button
@@ -325,7 +347,7 @@ const Dashboard: React.FC = () => {
                                 </tr>
                             </thead>
                             <tbody className="text-slate-300">
-                                {sales?.slice(0, 5).map((sale: any) => (
+                                {salesArray.slice(0, 5).map((sale: Sale) => (
                                     <tr key={sale.id} className="border-b border-slate-800/50 hover:bg-white/5 transition-colors">
                                         <td className="py-3 pl-2 font-medium">{sale.clientName}</td>
                                         <td className="py-3 text-sm text-slate-400">{format(new Date(sale.saleDate), 'dd/MM/yyyy')}</td>

@@ -136,6 +136,15 @@ export const InstallPWAButton: React.FC<{ className?: string }> = ({ className =
         };
     }, []);
 
+    // Cleanup useEffect for handleUpdate
+    React.useEffect(() => {
+        let isMounted = true;
+
+        return () => {
+            isMounted = false;
+        };
+    }, []);
+
     const handleInstall = async () => {
         if (!deferredPrompt) {
             return;

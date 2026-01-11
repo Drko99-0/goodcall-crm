@@ -21,6 +21,8 @@ import notificationsService from '../services/notifications.service';
 import ProfileModal from './modals/ProfileModal';
 import { formatDistanceToNow } from 'date-fns';
 import { es } from 'date-fns/locale';
+import { useUserData } from '../hooks/use-user-data';
+import type { Notification, UserRole } from '../types';
 
 const Layout: React.FC = () => {
     const [isSidebarOpen, setIsSidebarOpen] = useState(true);
@@ -29,13 +31,14 @@ const Layout: React.FC = () => {
     const location = useLocation();
     const navigate = useNavigate();
     const queryClient = useQueryClient();
-    const user = JSON.parse(localStorage.getItem('user') || '{}');
+    const { user, loading: userLoading } = useUserData();
 
     // Consultar notificaciones reales
-    const { data: notifications = [] } = useQuery({
+    const { data: notifications = [] } = useQuery<Notification[]>({
         queryKey: ['notifications'],
         queryFn: notificationsService.getAll,
         refetchInterval: 30000, // Cada 30 segs
+        enabled: !!user
     });
 
     const markReadMutation = useMutation({
@@ -51,6 +54,14 @@ const Layout: React.FC = () => {
     const handleLogout = () => {
         authService.logout();
     };
+
+    if (userLoading || !user) {
+        return (
+            <div className="flex items-center justify-center min-h-screen bg-slate-950">
+                <div className="animate-spin h-8 w-8 border-2 border-brand-500 border-t-transparent rounded-full"></div>
+            </div>
+        );
+    }
 
     const menuItems = [
         { path: '/dashboard', icon: LayoutDashboard, label: 'Dashboard' },

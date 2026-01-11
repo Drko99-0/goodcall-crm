@@ -1,61 +1,26 @@
 import { io, Socket } from 'socket.io-client';
 import authService from './auth.service';
+import type {
+    WebSocketEventType,
+    WebSocketNotification,
+    SaleUpdatePayload,
+    WebSocketConnectOptions,
+    GoalUpdatePayload,
+    UserUpdatePayload,
+    SystemEventPayload,
+    WebSocketConnectionStats,
+} from '../types';
 
 /**
- * Tipos de eventos WebSocket
+ * Re-export types for backward compatibility
+ * @deprecated Import directly from '../types' instead
  */
-export type WebSocketEventType =
-    | 'notification'
-    | 'notification_read'
-    | 'notification_deleted'
-    | 'all_notifications_read'
-    | 'sale_update'
-    | 'goal_update'
-    | 'user_update'
-    | 'system_event'
-    | 'connected'
-    | 'error'
-    | 'room-joined'
-    | 'room-left'
-    | 'stats';
-
-/**
- * Interfaz para notificación WebSocket
- */
-export interface WebSocketNotification {
-    id?: string;
-    type: string;
-    title: string;
-    message: string;
-    relatedEntityType?: string;
-    relatedEntityId?: string;
-    actionUrl?: string;
-    isRead?: boolean;
-    createdAt?: Date;
-    event?: string;
-    notificationId?: string;
-    unreadCount?: number;
-    count?: number;
-}
-
-/**
- * Interfaz para actualización de venta
- */
-export interface SaleUpdatePayload {
-    event: 'sale_update';
-    action: 'created' | 'updated' | 'deleted';
-    data: any;
-    timestamp: Date;
-}
-
-/**
- * Opciones para conectar al WebSocket
- */
-interface WebSocketConnectOptions {
-    userId?: string;
-    token?: string;
-    autoConnect?: boolean;
-}
+export type {
+    WebSocketEventType,
+    WebSocketNotification,
+    SaleUpdatePayload,
+    WebSocketConnectOptions,
+};
 
 /**
  * Servicio WebSocket para notificaciones en tiempo real
@@ -82,7 +47,7 @@ class WebSocketService {
     private reconnectAttempts = 0;
     private maxReconnectAttempts = 5;
     private reconnectDelay = 1000; // 1 segundo
-    private listeners = new Map<WebSocketEventType, Set<(data: any) => void>>();
+    private listeners = new Map<WebSocketEventType, Set<(data: unknown) => void>>();
 
     private get API_URL(): string {
         return import.meta.env.VITE_API_URL || 'https://backend-production-6ce5a.up.railway.app';
@@ -183,7 +148,7 @@ class WebSocketService {
     /**
      * Registra un listener para un evento específico
      */
-    on(eventType: WebSocketEventType, callback: (data: any) => void): void {
+    on(eventType: WebSocketEventType, callback: (data: unknown) => void): void {
         if (!this.listeners.has(eventType)) {
             this.listeners.set(eventType, new Set());
         }
@@ -198,7 +163,7 @@ class WebSocketService {
     /**
      * Elimina un listener de un evento específico
      */
-    off(eventType: WebSocketEventType, callback: (data: any) => void): void {
+    off(eventType: WebSocketEventType, callback: (data: unknown) => void): void {
         const eventListeners = this.listeners.get(eventType);
         if (eventListeners) {
             eventListeners.delete(callback);
@@ -293,15 +258,15 @@ class WebSocketService {
             this.emitToListeners('notification', data);
         });
 
-        this.socket.on('notification_read', (data: any) => {
+        this.socket.on('notification_read', (data: unknown) => {
             this.emitToListeners('notification_read', data);
         });
 
-        this.socket.on('notification_deleted', (data: any) => {
+        this.socket.on('notification_deleted', (data: unknown) => {
             this.emitToListeners('notification_deleted', data);
         });
 
-        this.socket.on('all_notifications_read', (data: any) => {
+        this.socket.on('all_notifications_read', (data: unknown) => {
             this.emitToListeners('all_notifications_read', data);
         });
 
@@ -310,39 +275,39 @@ class WebSocketService {
             this.emitToListeners('sale_update', data);
         });
 
-        this.socket.on('goal_update', (data: any) => {
+        this.socket.on('goal_update', (data: GoalUpdatePayload) => {
             this.emitToListeners('goal_update', data);
         });
 
-        this.socket.on('user_update', (data: any) => {
+        this.socket.on('user_update', (data: UserUpdatePayload) => {
             this.emitToListeners('user_update', data);
         });
 
-        this.socket.on('system_event', (data: any) => {
+        this.socket.on('system_event', (data: SystemEventPayload) => {
             this.emitToListeners('system_event', data);
         });
 
         // Eventos de conexión
-        this.socket.on('connected', (data: any) => {
+        this.socket.on('connected', (data: unknown) => {
             console.log('[WebSocket] Server confirmed connection:', data);
             this.emitToListeners('connected', data);
         });
 
-        this.socket.on('room-joined', (data: any) => {
+        this.socket.on('room-joined', (data: unknown) => {
             console.log('[WebSocket] Room joined:', data);
             this.emitToListeners('room-joined', data);
         });
 
-        this.socket.on('room-left', (data: any) => {
+        this.socket.on('room-left', (data: unknown) => {
             console.log('[WebSocket] Room left:', data);
             this.emitToListeners('room-left', data);
         });
 
-        this.socket.on('stats', (data: any) => {
+        this.socket.on('stats', (data: WebSocketConnectionStats) => {
             this.emitToListeners('stats', data);
         });
 
-        this.socket.on('error', (data: any) => {
+        this.socket.on('error', (data: unknown) => {
             console.error('[WebSocket] Error:', data);
             this.emitToListeners('error', data);
         });
@@ -351,7 +316,7 @@ class WebSocketService {
     /**
      * Emite un evento a todos los listeners registrados
      */
-    private emitToListeners(eventType: WebSocketEventType, data: any): void {
+    private emitToListeners(eventType: WebSocketEventType, data: unknown): void {
         const listeners = this.listeners.get(eventType);
         if (listeners) {
             listeners.forEach((callback) => {

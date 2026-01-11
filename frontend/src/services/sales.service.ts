@@ -1,63 +1,20 @@
 import api from './api';
+import type {
+    Sale,
+    SalesFilter,
+    SaleCreateInput,
+    SaleUpdateInput,
+    SalesResponse,
+} from '../types';
 
-export interface Sale {
-    id: string;
-    asesorId: string;
-    companyId?: string;
-    saleStatusId?: string;
-    saleDate: string;
-    clientName?: string;
-    clientDni?: string;
-    clientPhone?: string;
-    extraInfo?: string;
-    address?: string; // Mantener por si acaso el esquema crece, aunque no está en Prisma
-    products?: any[];
-    createdAt: string;
-    cerradorId?: string;
-    fidelizadorId?: string;
-    companySoldId?: string;
-    technologyId?: string;
-    saleStatus?: {
-        name: string;
-        color: string;
-        code: string;
-    };
-    company?: {
-        name: string;
-        code: string;
-    };
-    companySold?: {
-        name: string;
-        code: string;
-    };
-    technology?: {
-        name: string;
-        code: string;
-    };
-    asesor?: {
-        firstName: string;
-        lastName: string;
-    };
-    cerrador?: {
-        firstName: string;
-        lastName: string;
-    };
-    fidelizador?: {
-        firstName: string;
-        lastName: string;
-    };
-}
-
-export interface SalesFilter {
-    asesorId?: string;
-    startDate?: string;
-    endDate?: string;
-    page?: number;
-    limit?: number;
-}
+/**
+ * Re-export Sale type for backward compatibility
+ * @deprecated Import Sale from '../types' instead
+ */
+export type { Sale, SalesFilter } from '../types';
 
 const salesService = {
-    getAll: async (filter?: SalesFilter) => {
+    getAll: async (filter?: SalesFilter): Promise<Sale[] | SalesResponse> => {
         const params = new URLSearchParams();
         if (filter?.asesorId) params.append('asesorId', filter.asesorId);
         if (filter?.startDate) params.append('startDate', filter.startDate);
@@ -65,28 +22,26 @@ const salesService = {
         if (filter?.page) params.append('page', filter.page.toString());
         if (filter?.limit) params.append('limit', filter.limit.toString());
 
-        const response = await api.get<any>(`/sales?${params.toString()}`);
-        // Asumiendo que el backend retorna { data: Sale[], total: number, page: number, limit: number }
-        // Si no, volvemos al array plano para no romper nada, pero el tipado sugiere Sale[]
+        const response = await api.get<Sale[] | SalesResponse>(`/sales?${params.toString()}`);
         return response.data;
     },
 
-    getById: async (id: string) => {
+    getById: async (id: string): Promise<Sale> => {
         const response = await api.get<Sale>(`/sales/${id}`);
         return response.data;
     },
 
-    create: async (data: any) => {
+    create: async (data: SaleCreateInput): Promise<Sale> => {
         const response = await api.post<Sale>('/sales', data);
         return response.data;
     },
 
-    update: async (id: string, data: any) => {
+    update: async (id: string, data: Partial<SaleCreateInput>): Promise<Sale> => {
         const response = await api.patch<Sale>(`/sales/${id}`, data);
         return response.data;
     },
 
-    delete: async (id: string) => {
+    delete: async (id: string): Promise<void> => {
         await api.delete(`/sales/${id}`);
     }
 };

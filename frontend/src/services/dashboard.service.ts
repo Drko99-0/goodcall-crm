@@ -1,36 +1,25 @@
 import { useMemo } from 'react';
 import { format, subDays, startOfDay, endOfDay } from 'date-fns';
+import type {
+    Sale,
+    Goal,
+    User,
+    ChartDataPoint,
+    SalesByStatus,
+    PerformanceData,
+    DashboardMetrics,
+} from '../types';
 
 /**
- * Tipos de datos para gráficos
+ * Re-export chart types for backward compatibility
+ * @deprecated Import from '../types' instead
  */
-export interface ChartDataPoint {
-    date: string;
-    value: number;
-    label?: string;
-}
-
-export interface SalesByStatus {
-    status: string;
-    count: number;
-    color: string;
-}
-
-export interface PerformanceData {
-    asesor: string;
-    ventas: number;
-    meta: number;
-    progreso: number;
-}
-
-/**
- * Servicios de utilidad para dashboard y gráficos
- */
+export type { ChartDataPoint, SalesByStatus, PerformanceData };
 
 /**
  * Genera datos para gráfico de ventas por día
  */
-export function generateDailySalesData(sales: any[], days: number = 30): ChartDataPoint[] {
+export function generateDailySalesData(sales: Sale[], days: number = 30): ChartDataPoint[] {
     const data: ChartDataPoint[] = [];
 
     for (let i = days - 1; i >= 0; i--) {
@@ -55,7 +44,7 @@ export function generateDailySalesData(sales: any[], days: number = 30): ChartDa
 /**
  * Genera datos para gráfico de ventas por estado
  */
-export function generateSalesByStatusData(sales: any[]): SalesByStatus[] {
+export function generateSalesByStatusData(sales: Sale[]): SalesByStatus[] {
     const statusColors: Record<string, string> = {
         'Vendido': '#10b981',      // green
         'En Proceso': '#f59e0b',    // amber
@@ -84,8 +73,8 @@ export function generateSalesByStatusData(sales: any[]): SalesByStatus[] {
  * Genera datos para gráfico de rendimiento de asesores
  */
 export function generatePerformanceData(
-    sales: any[],
-    goals: any[],
+    sales: Sale[],
+    goals: Goal[],
     asesorNameMap: Map<string, string>
 ): PerformanceData[] {
     const asesorSales = new Map<string, number>();
@@ -127,7 +116,7 @@ export function generatePerformanceData(
 /**
  * Genera datos para gráfico de ventas por compañía
  */
-export function generateSalesByCompanyData(sales: any[]): { name: string; value: number; color: string }[] {
+export function generateSalesByCompanyData(sales: Sale[]): { name: string; value: number; color: string }[] {
     const companyMap = new Map<string, number>();
 
     sales.forEach(sale => {
@@ -158,7 +147,7 @@ export function generateSalesByCompanyData(sales: any[]): { name: string; value:
 /**
  * Calcula métricas del dashboard
  */
-export function calculateDashboardMetrics(sales: any[], goals: any[]) {
+export function calculateDashboardMetrics(sales: Sale[], goals: Goal[]): DashboardMetrics {
     const today = new Date();
     const startOfMonth = new Date(today.getFullYear(), today.getMonth(), 1);
     const startOfLastMonth = new Date(today.getFullYear(), today.getMonth() - 1, 1);
@@ -181,8 +170,11 @@ export function calculateDashboardMetrics(sales: any[], goals: any[]) {
         ? ((salesThisMonth - salesLastMonth) / salesLastMonth) * 100
         : 0;
 
-    // Ventas activas
-    const activeSales = sales.filter(sale => sale.isActive).length;
+    // Ventas activas (ventas que no están canceladas)
+    const activeSales = sales.filter(sale => {
+        const status = sale.saleStatus?.code || '';
+        return status !== 'CANC';
+    }).length;
 
     // Meta global
     const globalGoal = goals.find(g => g.goalType === 'global');
@@ -209,7 +201,7 @@ export function calculateDashboardMetrics(sales: any[], goals: any[]) {
 /**
  * Hook personalizado para datos del dashboard
  */
-export function useDashboardData(sales: any[], goals: any[], users: any[]) {
+export function useDashboardData(sales: Sale[], goals: Goal[], users: User[]) {
     return useMemo(() => {
         // Crear mapa de nombres de asesores
         const asesorNameMap = new Map<string, string>();
@@ -230,7 +222,7 @@ export function useDashboardData(sales: any[], goals: any[], users: any[]) {
 /**
  * Hook para datos de un asesor específico
  */
-export function useAsesorDashboardData(asesorId: string, sales: any[], goals: any[]) {
+export function useAsesorDashboardData(asesorId: string, sales: Sale[], goals: Goal[]) {
     return useMemo(() => {
         const asesorSales = sales.filter(s => s.asesorId === asesorId);
         const asesorGoal = goals.find(g => g.targetUserId === asesorId);

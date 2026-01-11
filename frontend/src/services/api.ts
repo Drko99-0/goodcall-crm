@@ -1,4 +1,36 @@
-import axios from 'axios';
+import axios, { AxiosError } from 'axios';
+
+/**
+ * Navigation callback type
+ * Use setNavigateCallback to inject the navigate function from React Router
+ */
+type NavigateFunction = (path: string, options?: { replace?: boolean }) => void;
+let navigateCallback: NavigateFunction | null = null;
+
+/**
+ * Set the navigate function to be used for redirects
+ * Call this from your Router component or App root
+ */
+export function setNavigateCallback(navigate: NavigateFunction) {
+    navigateCallback = navigate;
+}
+
+/**
+ * Internal function to perform navigation
+ * Falls back to window.location if navigate callback is not set
+ */
+function performNavigation(path: string, replace = false) {
+    if (navigateCallback) {
+        navigateCallback(path, { replace });
+    } else {
+        // Fallback to window.location if navigate callback not set
+        if (replace) {
+            window.location.replace(path);
+        } else {
+            window.location.href = path;
+        }
+    }
+}
 
 const api = axios.create({
     baseURL: import.meta.env.VITE_API_URL || 'https://backend-production-6ce5a.up.railway.app/api',
@@ -10,16 +42,16 @@ const api = axios.create({
 // Flag para prevenir múltiples intentos de refresh simultáneos
 let isRefreshing = false;
 let failedQueue: Array<{
-    resolve: (value?: any) => void;
-    reject: (reason?: any) => void;
+    resolve: (value?: string) => void;
+    reject: (reason?: unknown) => void;
 }> = [];
 
-const processQueue = (error: any, token: string | null = null) => {
+const processQueue = (error: unknown, token: string | null = null) => {
     failedQueue.forEach((prom) => {
         if (error) {
             prom.reject(error);
         } else {
-            prom.resolve(token);
+            prom.resolve(token || '');
         }
     });
     failedQueue = [];
@@ -37,8 +69,8 @@ api.interceptors.request.use((config) => {
 // Interceptor para manejar errores y refresh token
 api.interceptors.response.use(
     (response) => response,
-    async (error) => {
-        const originalRequest = error.config;
+    async (error: AxiosError) => {
+        const originalRequest = error.config as any;
 
         // Si el error es 401 y no hemos intentado refresh aún
         if (error.response?.status === 401 && !originalRequest._retry) {
@@ -49,7 +81,7 @@ api.interceptors.response.use(
                 localStorage.removeItem('refreshToken');
                 localStorage.removeItem('user');
                 if (window.location.pathname !== '/login') {
-                    window.location.href = '/login';
+                    performNavigation('/login', true);
                 }
                 return Promise.reject(error);
             }
@@ -81,7 +113,7 @@ api.interceptors.response.use(
                 localStorage.removeItem('accessToken');
                 localStorage.removeItem('user');
                 if (window.location.pathname !== '/login') {
-                    window.location.href = '/login';
+                    performNavigation('/login', true);
                 }
                 isRefreshing = false;
                 return Promise.reject(error);
@@ -117,7 +149,7 @@ api.interceptors.response.use(
                 localStorage.removeItem('refreshToken');
                 localStorage.removeItem('user');
                 if (window.location.pathname !== '/login') {
-                    window.location.href = '/login';
+                    performNavigation('/login', true);
                 }
                 isRefreshing = false;
                 return Promise.reject(refreshError);

@@ -10,6 +10,8 @@ import technologiesService from '../../services/technologies.service';
 import saleStatusesService from '../../services/sale-statuses.service';
 import usersService from '../../services/users.service';
 import salesService from '../../services/sales.service';
+import { useUserData } from '../../hooks/use-user-data';
+import type { Sale, User, Company, Technology, SaleStatus, SaleCreateInput } from '../../types';
 
 // --- Schema Validation ---
 const saleSchema = z.object({
@@ -32,19 +34,19 @@ type SaleFormData = z.infer<typeof saleSchema>;
 interface SalesFormModalProps {
     isOpen: boolean;
     onClose: () => void;
-    saleToEdit?: any; // Tipar mejor si es posible con la interfaz Sale
+    saleToEdit?: Sale;
 }
 
 const SalesFormModal: React.FC<SalesFormModalProps> = ({ isOpen, onClose, saleToEdit }) => {
     const queryClient = useQueryClient();
-    const [user] = React.useState(() => JSON.parse(localStorage.getItem('user') || '{}'));
+    const { user } = useUserData();
     const isEditMode = !!saleToEdit;
 
     // --- Data Fetching ---
-    const { data: companies } = useQuery({ queryKey: ['companies'], queryFn: companiesService.getAll });
-    const { data: technologies } = useQuery({ queryKey: ['technologies'], queryFn: technologiesService.getAll });
-    const { data: statuses } = useQuery({ queryKey: ['statuses'], queryFn: saleStatusesService.getAll });
-    const { data: allUsers } = useQuery({ queryKey: ['asesores'], queryFn: usersService.getAsesores, retry: false });
+    const { data: companies } = useQuery<Company[]>({ queryKey: ['companies'], queryFn: companiesService.getAll });
+    const { data: technologies } = useQuery<Technology[]>({ queryKey: ['technologies'], queryFn: technologiesService.getAll });
+    const { data: statuses } = useQuery<SaleStatus[]>({ queryKey: ['statuses'], queryFn: saleStatusesService.getAll });
+    const { data: allUsers } = useQuery<User[]>({ queryKey: ['asesores'], queryFn: usersService.getAsesores, retry: false });
 
     // Filtrado de usuarios según su rol "ocupado"
     const asesores = allUsers?.filter(u => u.role === 'asesor');
@@ -63,7 +65,7 @@ const SalesFormModal: React.FC<SalesFormModalProps> = ({ isOpen, onClose, saleTo
             clientName: '',
             clientDni: '',
             clientPhone: '',
-            asesorId: user.role === 'asesor' ? user.id : '',
+            asesorId: user?.role === 'asesor' ? user.id : '',
             cerradorId: '',
             fidelizadorId: '',
             extraInfo: ''
@@ -78,6 +80,8 @@ const SalesFormModal: React.FC<SalesFormModalProps> = ({ isOpen, onClose, saleTo
             initializedRef.current = false;
             return;
         }
+
+        if (!user) return;
 
         if (isOpen && !initializedRef.current) {
             initializedRef.current = true;
@@ -114,7 +118,7 @@ const SalesFormModal: React.FC<SalesFormModalProps> = ({ isOpen, onClose, saleTo
                 });
             }
         }
-    }, [isOpen, saleToEdit?.id, reset, user.id, user.role]);
+    }, [isOpen, saleToEdit?.id, reset, user?.id, user?.role, user]);
 
     // --- Mutations ---
     const createMutation = useMutation({
@@ -127,7 +131,12 @@ const SalesFormModal: React.FC<SalesFormModalProps> = ({ isOpen, onClose, saleTo
     });
 
     const updateMutation = useMutation({
-        mutationFn: (data: any) => salesService.update(saleToEdit.id, data),
+        mutationFn: (data: Partial<SaleCreateInput>) => {
+            if (!saleToEdit?.id) {
+                return Promise.reject(new Error('No sale to edit'));
+            }
+            return salesService.update(saleToEdit.id, data);
+        },
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: ['sales', 'list'] });
             onClose();
@@ -294,7 +303,7 @@ const SalesFormModal: React.FC<SalesFormModalProps> = ({ isOpen, onClose, saleTo
                                                 render={({ field }) => (
                                                     <select
                                                         {...field}
-                                                        disabled={user.role === 'asesor' && isEditMode}
+                                                        disabled={user?.role === 'asesor' && isEditMode}
                                                         className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-2 text-white focus:outline-none focus:border-brand-500 disabled:opacity-50"
                                                     >
                                                         <option value="">Pendiente</option>
@@ -302,7 +311,7 @@ const SalesFormModal: React.FC<SalesFormModalProps> = ({ isOpen, onClose, saleTo
                                                     </select>
                                                 )}
                                             />
-                                            {user.role === 'asesor' && isEditMode && <p className="text-[10px] text-slate-500 italic">No tienes permisos para cambiar el estado</p>}
+                                            {user?.role === 'asesor' && isEditMode && <p className="text-[10px] text-slate-500 italic">No tienes permisos para cambiar el estado</p>}
                                         </div>
 
                                         <div className="space-y-2">
@@ -313,7 +322,7 @@ const SalesFormModal: React.FC<SalesFormModalProps> = ({ isOpen, onClose, saleTo
                                                 render={({ field }) => (
                                                     <select
                                                         {...field}
-                                                        disabled={user.role === 'asesor'}
+                                                        disabled={user?.role === 'asesor'}
                                                         className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-2 text-white focus:outline-none focus:border-brand-500 disabled:opacity-50"
                                                     >
                                                         <option value="">Seleccione...</option>

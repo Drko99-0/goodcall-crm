@@ -1,12 +1,13 @@
 import { useState, useMemo, useEffect } from 'react';
 import { fuzzySearchService, FuzzySearchResult } from '../services/fuzzy-search.service';
+import type { Sale, User, Company } from '../types';
 
 /**
  * Opciones para el hook de búsqueda fuzzy
  */
 interface UseFuzzySearchOptions<T> {
     data: T[];
-    keys?: Array<string | any>;
+    keys?: string[];
     threshold?: number;
     minMatchCharLength?: number;
     maxScore?: number;
@@ -124,7 +125,7 @@ export function useFuzzySearch<T>(
 /**
  * Hook específico para búsqueda de ventas
  */
-export function useSalesFuzzySearch(sales: any[], query: string) {
+export function useSalesFuzzySearch(sales: Sale[], query: string) {
     return useMemo(() => {
         if (!query || query.trim().length === 0) {
             return sales;
@@ -137,7 +138,7 @@ export function useSalesFuzzySearch(sales: any[], query: string) {
 /**
  * Hook específico para búsqueda de usuarios
  */
-export function useUsersFuzzySearch(users: any[], query: string) {
+export function useUsersFuzzySearch(users: User[], query: string) {
     return useMemo(() => {
         if (!query || query.trim().length === 0) {
             return users;
@@ -150,7 +151,7 @@ export function useUsersFuzzySearch(users: any[], query: string) {
 /**
  * Hook específico para búsqueda de compañías
  */
-export function useCompaniesFuzzySearch(companies: any[], query: string) {
+export function useCompaniesFuzzySearch(companies: Company[], query: string) {
     return useMemo(() => {
         if (!query || query.trim().length === 0) {
             return companies;

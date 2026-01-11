@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import salesService, { Sale } from '../services/sales.service';
+import salesService, { type Sale } from '../services/sales.service';
 import { format } from 'date-fns';
 import {
     Search,
@@ -23,10 +23,13 @@ import SalesFormModal from '../components/modals/SalesFormModal';
 import companiesService from '../services/companies.service';
 import saleStatusesService from '../services/sale-statuses.service';
 import usersService from '../services/users.service';
+import { useUserData } from '../hooks/use-user-data';
+import toast from '../utils/toast.utils';
+import type { Company, SaleStatus, User } from '../types';
 
 const SalesList: React.FC = () => {
     const queryClient = useQueryClient();
-    const user = JSON.parse(localStorage.getItem('user') || '{}');
+    const { user } = useUserData();
     const [searchTerm, setSearchTerm] = useState('');
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [saleToEdit, setSaleToEdit] = useState<Sale | undefined>(undefined);
@@ -43,17 +46,18 @@ const SalesList: React.FC = () => {
         limit: 10
     });
 
-    const { data: companies } = useQuery({ queryKey: ['companies'], queryFn: companiesService.getAll });
-    const { data: statuses } = useQuery({ queryKey: ['statuses'], queryFn: saleStatusesService.getAll });
-    const { data: asesores } = useQuery({ queryKey: ['asesores'], queryFn: usersService.getAsesores });
+    const { data: companies } = useQuery<Company[]>({ queryKey: ['companies'], queryFn: companiesService.getAll });
+    const { data: statuses } = useQuery<SaleStatus[]>({ queryKey: ['statuses'], queryFn: saleStatusesService.getAll });
+    const { data: asesores } = useQuery<User[]>({ queryKey: ['asesores'], queryFn: usersService.getAsesores });
 
     const deleteMutation = useMutation({
         mutationFn: salesService.delete,
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: ['sales', 'list'] });
+            toast.success('Venta eliminada correctamente');
         },
         onError: () => {
-            alert('Error al eliminar la venta');
+            toast.error('Error al eliminar la venta');
         }
     });
 
@@ -61,9 +65,10 @@ const SalesList: React.FC = () => {
         mutationFn: (id: string) => salesService.update(id, { saleStatusId: '6b6b6b6b-6b6b-6b6b-6b6b-6b6b6b6b6b6b' }), // ID de CANC, idealmente dinámico
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: ['sales', 'list'] });
+            toast.success('Venta cancelada correctamente');
         },
         onError: () => {
-            alert('Error al cancelar la venta');
+            toast.error('Error al cancelar la venta');
         }
     });
 
@@ -99,15 +104,16 @@ const SalesList: React.FC = () => {
         queryKey: ['sales', 'list', filters],
         queryFn: () => salesService.getAll({
             // Si es admin/developer puede ver todo, si no filtrar por su ID
-            asesorId: filters.asesorId || (['developer', 'gerencia', 'coordinador'].includes(user.role) ? undefined : user.id),
+            asesorId: filters.asesorId || (user && ['developer', 'gerencia', 'coordinador'].includes(user.role) ? undefined : user?.id),
             startDate: filters.startDate || undefined,
             endDate: filters.endDate || undefined,
             // Nota: El backend debe soportar statusId y companyId en el filtro si queremos que sea 100% server-side
-        })
+        }),
+        enabled: !!user
     });
 
     // Filtrado local para status y company si el backend no los soporta aún en el getAll base
-    const filteredSales = (Array.isArray(sales) ? sales : (sales as any)?.data || [])?.filter((sale: Sale) => {
+    const filteredSales = (Array.isArray(sales) ? sales : (sales as { data?: Sale[] })?.data || [])?.filter((sale: Sale) => {
         const matchesSearch = sale.clientName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
             sale.clientDni?.includes(searchTerm) ||
             sale.id.includes(searchTerm);
