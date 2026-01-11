@@ -1,0 +1,391 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ============================================
+// USERS
+// ============================================
+model User {
+  id                    String    @id @default(uuid())
+  username              String    @unique @db.VarChar(50)
+  email                 String    @unique @db.VarChar(255)
+  passwordHash          String    @map("password_hash") @db.VarChar(255)
+  firstName             String    @map("first_name") @db.VarChar(100)
+  lastName              String    @map("last_name") @db.VarChar(100)
+  role                  UserRole
+  
+  // Relaciones jerárquicas
+  coordinatorId         String?   @map("coordinator_id")
+  coordinator           User?     @relation("CoordinatorAsesores", fields: [coordinatorId], references: [id], onDelete: SetNull)
+  asesores              User[]    @relation("CoordinatorAsesores")
+  
+  // Seguridad
+  isActive              Boolean   @default(true) @map("is_active")
+  isLocked              Boolean   @default(false) @map("is_locked")
+  failedLoginAttempts   Int       @default(0) @map("failed_login_attempts")
+  lockedAt              DateTime? @map("locked_at")
+  lockedById            String?   @map("locked_by")
+  lockedBy              User?     @relation("LockedByUser", fields: [lockedById], references: [id], onDelete: SetNull)
+  lockedUsers           User[]    @relation("LockedByUser")
+  
+  lastLogin             DateTime? @map("last_login")
+  passwordChangedAt     DateTime? @map("password_changed_at")
+  mustChangePassword    Boolean   @default(true) @map("must_change_password")
+  
+  // 2FA
+  twoFactorEnabled      Boolean   @default(false) @map("two_factor_enabled")
+  twoFactorSecret       String?   @map("two_factor_secret") @db.VarChar(255)
+  twoFactorBackupCodes  String[]  @map("two_factor_backup_codes")
+  
+  // Sesión
+  currentSessionToken   String?   @map("current_session_token") @db.VarChar(255)
+  currentDeviceInfo     Json?     @map("current_device_info")
+  
+  // Auditoría
+  createdAt             DateTime  @default(now()) @map("created_at")
+  createdById           String?   @map("created_by")
+  createdBy             User?     @relation("CreatedByUser", fields: [createdById], references: [id], onDelete: SetNull)
+  usersCreated          User[]    @relation("CreatedByUser")
+  
+  updatedAt             DateTime  @updatedAt @map("updated_at")
+  updatedById           String?   @map("updated_by")
+  updatedBy             User?     @relation("UpdatedByUser", fields: [updatedById], references: [id], onDelete: SetNull)
+  usersUpdated          User[]    @relation("UpdatedByUser")
+  
+  deletedAt             DateTime? @map("deleted_at")
+  deletedById           String?   @map("deleted_by")
+  deletedBy             User?     @relation("DeletedByUser", fields: [deletedById], references: [id], onDelete: SetNull)
+  usersDeleted          User[]    @relation("DeletedByUser")
+  
+  // Relaciones
+  sales                 Sale[]    @relation("AsesorSales")
+  workerRoles           WorkerRole[]
+  activityLogs          ActivityLog[]
+  notifications         Notification[]
+  sessionConflicts      SessionConflict[]
+  goalsTarget           Goal[]    @relation("TargetUser")
+  goalsCreated          Goal[]    @relation("GoalCreatedBy")
+  goalsUpdated          Goal[]    @relation("GoalUpdatedBy")
+  
+  @@map("users")
+  @@index([role, deletedAt])
+  @@index([coordinatorId, deletedAt])
+  @@index([email])
+  @@index([username])
+}
+
+enum UserRole {
+  developer
+  gerencia
+  coordinador
+  asesor
+}
+
+// ============================================
+// WORKER ROLES
+// ============================================
+model WorkerRole {
+  id          String   @id @default(uuid())
+  userId      String   @map("user_id")
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  roleType    String   @map("role_type") @db.VarChar(50) // cerrador, fidelizador, etc.
+  isActive    Boolean  @default(true) @map("is_active")
+  
+  createdAt   DateTime @default(now()) @map("created_at")
+  createdById String?  @map("created_by")
+  
+  @@unique([userId, roleType])
+  @@map("worker_roles")
+}
+
+// ============================================
+// SALES
+// ============================================
+model Sale {
+  id              String      @id @default(uuid())
+  saleDate        DateTime    @default(now()) @map("sale_date") @db.Date
+  
+  // Cliente
+  clientName      String?     @map("client_name") @db.VarChar(255)
+  clientDni       String?     @map("client_dni") @db.VarChar(50)
+  clientPhone     String?     @map("client_phone") @db.VarChar(50)
+  
+  // Compañías
+  companyId       String?     @map("company_id")
+  company         Company?    @relation("SaleCompany", fields: [companyId], references: [id], onDelete: SetNull)
+  
+  companySoldId   String?     @map("company_sold_id")
+  companySold     Company?    @relation("SaleCompanySold", fields: [companySoldId], references: [id], onDelete: SetNull)
+  
+  // Asignaciones
+  asesorId        String      @map("asesor_id")
+  asesor          User        @relation("AsesorSales", fields: [asesorId], references: [id], onDelete: Restrict)
+  
+  cerradorId      String?     @map("cerrador_id")
+  fidelizadorId   String?     @map("fidelizador_id")
+  
+  // Estado y Tecnología
+  saleStatusId    String?     @map("sale_status_id")
+  saleStatus      SaleStatus? @relation(fields: [saleStatusId], references: [id], onDelete: SetNull)
+  
+  technologyId    String?     @map("technology_id")
+  technology      Technology? @relation(fields: [technologyId], references: [id], onDelete: SetNull)
+  
+  // Campos adicionales
+  extraInfo       String?     @map("extra_info") @db.Text
+  proofField      String?     @map("proof_field") @db.Text
+  
+  // Métricas
+  isActive        Boolean     @default(false) @map("is_active")
+  
+  // Auditoría
+  createdAt       DateTime    @default(now()) @map("created_at")
+  createdById     String?     @map("created_by")
+  
+  updatedAt       DateTime    @updatedAt @map("updated_at")
+  updatedById     String?     @map("updated_by")
+  
+  deletedAt       DateTime?   @map("deleted_at")
+  deletedById     String?     @map("deleted_by")
+  
+  @@map("sales")
+  @@index([asesorId, deletedAt])
+  @@index([saleDate, deletedAt])
+  @@index([saleStatusId])
+  @@index([isActive])
+}
+
+// ============================================
+// COMPANIES
+// ============================================
+model Company {
+  id            String   @id @default(uuid())
+  name          String   @unique @db.VarChar(255)
+  code          String?  @unique @db.VarChar(50)
+  isActive      Boolean  @default(true) @map("is_active")
+  displayOrder  Int      @default(0) @map("display_order")
+  
+  createdAt     DateTime @default(now()) @map("created_at")
+  createdById   String?  @map("created_by")
+  
+  updatedAt     DateTime @updatedAt @map("updated_at")
+  updatedById   String?  @map("updated_by")
+  
+  sales         Sale[]   @relation("SaleCompany")
+  salesSold     Sale[]   @relation("SaleCompanySold")
+  
+  @@map("companies")
+  @@index([isActive, displayOrder])
+}
+
+// ============================================
+// SALE STATUSES
+// ============================================
+model SaleStatus {
+  id              String   @id @default(uuid())
+  name            String   @unique @db.VarChar(255)
+  code            String?  @unique @db.VarChar(50)
+  color           String?  @db.VarChar(7) // Hex color
+  icon            String?  @db.VarChar(50)
+  isActiveStatus  Boolean  @default(false) @map("is_active_status")
+  isFinal         Boolean  @default(false) @map("is_final")
+  displayOrder    Int      @default(0) @map("display_order")
+  
+  createdAt       DateTime @default(now()) @map("created_at")
+  createdById     String?  @map("created_by")
+  
+  updatedAt       DateTime @updatedAt @map("updated_at")
+  updatedById     String?  @map("updated_by")
+  
+  sales           Sale[]
+  
+  @@map("sale_statuses")
+  @@index([isActiveStatus])
+}
+
+// ============================================
+// TECHNOLOGIES
+// ============================================
+model Technology {
+  id            String   @id @default(uuid())
+  name          String   @unique @db.VarChar(255)
+  code          String?  @unique @db.VarChar(50)
+  isActive      Boolean  @default(true) @map("is_active")
+  displayOrder  Int      @default(0) @map("display_order")
+  
+  createdAt     DateTime @default(now()) @map("created_at")
+  createdById   String?  @map("created_by")
+  
+  updatedAt     DateTime @updatedAt @map("updated_at")
+  updatedById   String?  @map("updated_by")
+  
+  sales         Sale[]
+  
+  @@map("technologies")
+}
+
+// ============================================
+// GOALS
+// ============================================
+model Goal {
+  id            String   @id @default(uuid())
+  goalType      GoalType @map("goal_type")
+  targetUserId  String?  @map("target_user_id")
+  targetUser    User?    @relation("TargetUser", fields: [targetUserId], references: [id], onDelete: Cascade)
+  
+  year          Int
+  month         Int      // 1-12
+  
+  targetSales   Int      @map("target_sales")
+  
+  createdAt     DateTime @default(now()) @map("created_at")
+  createdById   String?  @map("created_by")
+  createdBy     User?    @relation("GoalCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
+  
+  updatedAt     DateTime @updatedAt @map("updated_at")
+  updatedById   String?  @map("updated_by")
+  updatedBy     User?    @relation("GoalUpdatedBy", fields: [updatedById], references: [id], onDelete: SetNull)
+  
+  @@unique([goalType, targetUserId, year, month])
+  @@map("goals")
+  @@index([year, month])
+}
+
+enum GoalType {
+  global
+  coordinador
+  asesor
+}
+
+// ============================================
+// FIELD VISIBILITY
+// ============================================
+model FieldVisibility {
+  id              String   @id @default(uuid())
+  coordinatorId   String   @map("coordinator_id")
+  asesorId        String?  @map("asesor_id") // NULL = todo el equipo
+  hiddenFields    String[] @default([]) @map("hidden_fields")
+  
+  createdAt       DateTime @default(now()) @map("created_at")
+  updatedAt       DateTime @updatedAt @map("updated_at")
+  
+  @@unique([coordinatorId, asesorId])
+  @@map("field_visibility")
+}
+
+// ============================================
+// ACTIVITY LOGS
+// ============================================
+model ActivityLog {
+  id            String    @id @default(uuid())
+  userId        String?   @map("user_id")
+  user          User?     @relation(fields: [userId], references: [id], onDelete: SetNull)
+  
+  action        String    @db.VarChar(100)
+  entityType    String?   @map("entity_type") @db.VarChar(50)
+  entityId      String?   @map("entity_id")
+  
+  description   String?   @db.Text
+  oldValues     Json?     @map("old_values")
+  newValues     Json?     @map("new_values")
+  
+  ipAddress     String?   @map("ip_address") @db.VarChar(45)
+  userAgent     String?   @map("user_agent") @db.Text
+  deviceInfo    Json?     @map("device_info")
+  
+  createdAt     DateTime  @default(now()) @map("created_at")
+  
+  @@map("activity_logs")
+  @@index([userId, createdAt])
+  @@index([action])
+  @@index([entityType, entityId])
+  @@index([createdAt(sort: Desc)])
+}
+
+// ============================================
+// LOGIN ATTEMPTS
+// ============================================
+model LoginAttempt {
+  id              String   @id @default(uuid())
+  username        String?  @db.VarChar(255)
+  email           String?  @db.VarChar(255)
+  success         Boolean
+  ipAddress       String?  @map("ip_address") @db.VarChar(45)
+  userAgent       String?  @map("user_agent") @db.Text
+  failureReason   String?  @map("failure_reason") @db.VarChar(255)
+  
+  createdAt       DateTime @default(now()) @map("created_at")
+  
+  @@map("login_attempts")
+  @@index([username, createdAt(sort: Desc)])
+  @@index([ipAddress, createdAt(sort: Desc)])
+}
+
+// ============================================
+// SESSION CONFLICTS
+// ============================================
+model SessionConflict {
+  id              String   @id @default(uuid())
+  userId          String   @map("user_id")
+  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  oldDeviceInfo   Json?    @map("old_device_info")
+  oldIpAddress    String?  @map("old_ip_address") @db.VarChar(45)
+  
+  newDeviceInfo   Json?    @map("new_device_info")
+  newIpAddress    String?  @map("new_ip_address") @db.VarChar(45)
+  
+  resolved        Boolean  @default(false)
+  resolvedAction  String?  @map("resolved_action") @db.VarChar(50)
+  
+  createdAt       DateTime @default(now()) @map("created_at")
+  
+  @@map("session_conflicts")
+  @@index([userId, resolved])
+}
+
+// ============================================
+// NOTIFICATIONS
+// ============================================
+model Notification {
+  id                  String    @id @default(uuid())
+  userId              String    @map("user_id")
+  user                User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  type                String    @db.VarChar(50)
+  title               String    @db.VarChar(255)
+  message             String    @db.Text
+  
+  isRead              Boolean   @default(false) @map("is_read")
+  readAt              DateTime? @map("read_at")
+  
+  relatedEntityType   String?   @map("related_entity_type") @db.VarChar(50)
+  relatedEntityId     String?   @map("related_entity_id")
+  actionUrl           String?   @map("action_url") @db.VarChar(255)
+  
+  createdAt           DateTime  @default(now()) @map("created_at")
+  
+  @@map("notifications")
+  @@index([userId, isRead, createdAt(sort: Desc)])
+}
+
+// ============================================
+// SYSTEM SETTINGS
+// ============================================
+model SystemSetting {
+  id          String   @id @default(uuid())
+  key         String   @unique @db.VarChar(100)
+  value       String?  @db.Text
+  description String?  @db.Text
+  isPublic    Boolean  @default(false) @map("is_public")
+  
+  updatedAt   DateTime @updatedAt @map("updated_at")
+  updatedById String?  @map("updated_by")
+  
+  @@map("system_settings")
+}

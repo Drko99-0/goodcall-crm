@@ -1,0 +1,9 @@
+node_modules/
+dist/
+.env
+*.log
+/generated/prisma
+.next/
+build/
+coverage/
+package-lock.json

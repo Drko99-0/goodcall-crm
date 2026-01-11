@@ -1,0 +1,42 @@
+# Railway configuration for GoodCall CRM Frontend
+
+[build]
+builder = "NIXPACKS"
+buildCommand = "npm install && npm run build"
+
+[deploy]
+startCommand = "npm run start"
+healthcheckPath = "/"
+healthcheckTimeout = 300
+restartPolicyType = "ON_FAILURE"
+restartPolicyMaxRetries = 10
+
+[deploy.env.VITE_API_URL]
+# Update with your backend URL after deployment
+[deploy.env.VITE_API_URL.value]
+defaultValue = "https://your-backend-url.railway.app/api"
+
+[deploy.env.NODE_ENV]
+defaultValue = "production"
+
+[[services]]
+name = "frontend"
+type = "web"
+title = "GoodCall CRM Frontend"
+
+[[services.ports]]
+port = 3000
+type = "HTTP"
+
+[services.ports.health_checks]
+[services.ports.health_checks.liveness]
+path = "/"
+interval_seconds = 30
+timeout_seconds = 5
+failure_threshold = 3
+
+[services.ports.health_checks.readiness]
+path = "/"
+interval_seconds = 30
+timeout_seconds = 5
+failure_threshold = 3
