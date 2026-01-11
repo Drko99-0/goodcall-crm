@@ -47,7 +47,7 @@ interface UseFuzzySearchResult<T> {
  */
 export function useFuzzySearch<T>(
     data: T[],
-    options: UseFuzzySearchOptions<T> = {}
+    options: Partial<UseFuzzySearchOptions<T>> = {}
 ): UseFuzzySearchResult<T> {
     const {
         keys,
@@ -165,7 +165,7 @@ export function useCompaniesFuzzySearch(companies: any[], query: string) {
  */
 export function useDebouncedFuzzySearch<T>(
     data: T[],
-    options: UseFuzzySearchOptions<T> & { debounceMs?: number } = {}
+    options: Partial<UseFuzzySearchOptions<T>> & { debounceMs?: number } = {}
 ) {
     const { debounceMs = 300, ...searchOptions } = options;
 

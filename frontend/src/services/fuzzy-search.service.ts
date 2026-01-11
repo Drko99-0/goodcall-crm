@@ -1,10 +1,10 @@
-import Fuse from 'fuse.js';
+import Fuse, { type FuseOptionKeyObject, type FuseResultMatch } from 'fuse.js';
 
 /**
  * Opciones de configuración para Fuse.js
  */
 interface FuseOptions<T> {
-    keys?: Array<string | Fuse.FuseOptionKeyObject<T>>;
+    keys?: Array<string | FuseOptionKeyObject<T>>;
     threshold?: number;
     distance?: number;
     minMatchCharLength?: number;
@@ -19,7 +19,7 @@ interface FuseOptions<T> {
 export interface FuzzySearchResult<T> {
     item: T;
     score?: number;
-    matches?: Fuse.FuseResultMatch[];
+    matches?: readonly FuseResultMatch[] | undefined;
 }
 
 /**
@@ -172,7 +172,7 @@ class FuzzySearchService {
     customSearch<T>(
         data: T[],
         query: string,
-        keys: Array<string | Fuse.FuseOptionKeyObject<T>>,
+        keys: Array<string | FuseOptionKeyObject<T>>,
         preset: 'general' | 'strict' | 'flexible' = 'general'
     ): FuzzySearchResult<T>[] {
         return this.search(data, query, {
@@ -221,7 +221,7 @@ class FuzzySearchService {
     extendedSearch<T>(
         data: T[],
         query: string,
-        keys: Array<string | Fuse.FuseOptionKeyObject<T>>
+        keys: Array<string | FuseOptionKeyObject<T>>
     ): T[] {
         if (!query || query.trim().length === 0) {
             return data;

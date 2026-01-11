@@ -1,5 +1,5 @@
 import { io, Socket } from 'socket.io-client';
-import { authService } from './auth.service';
+import authService from './auth.service';
 
 /**
  * Tipos de eventos WebSocket
@@ -82,7 +82,7 @@ class WebSocketService {
     private reconnectAttempts = 0;
     private maxReconnectAttempts = 5;
     private reconnectDelay = 1000; // 1 segundo
-    private listeners = new Map<WebSocketEventType, Set<Function>>();
+    private listeners = new Map<WebSocketEventType, Set<(data: any) => void>>();
 
     private get API_URL(): string {
         return import.meta.env.VITE_API_URL || 'https://backend-production-6ce5a.up.railway.app';
