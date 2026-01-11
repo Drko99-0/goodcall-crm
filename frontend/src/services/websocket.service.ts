@@ -104,7 +104,6 @@ class WebSocketService {
         return new Promise((resolve, reject) => {
             try {
                 this.socket = io(this.API_URL, {
-                    path: '/socket.io/',
                     query: { userId: connectUserId },
                     auth: { token: connectToken },
                     transports: ['websocket', 'polling'],

@@ -14,7 +14,6 @@ import { Server, Socket } from 'socket.io';
         origin: '*', // Ajustar según producción
     },
     transports: ['websocket', 'polling'],
-    path: '/socket.io/',
 })
 export class NotificationsGateway implements OnGatewayConnection, OnGatewayDisconnect {
     @WebSocketServer()
