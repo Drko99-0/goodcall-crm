@@ -10,6 +10,7 @@ import {
 import { Server, Socket } from 'socket.io';
 
 @WebSocketGateway({
+    namespace: '/ws',
     cors: {
         origin: '*', // Ajustar según producción
     },
