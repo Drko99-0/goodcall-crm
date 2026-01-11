@@ -28,10 +28,14 @@ async function bootstrap() {
     credentials: true,
   });
 
+  // Global prefix for all routes
+  app.setGlobalPrefix('api');
+
   const port = configService.get<number>('PORT') || 3000;
   await app.listen(port);
 
   logger.log(`Application is running on: http://localhost:${port}`);
+  logger.log(`API prefix: /api`);
   logger.log(`CORS Origins: ${origins.join(', ')}`);
 }
 bootstrap();
