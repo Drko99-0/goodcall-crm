@@ -7,7 +7,7 @@ export class PrismaService extends PrismaClient implements OnModuleInit, OnModul
     await this.$connect();
 
     // Middleware para soft deletes automáticos
-    (this as any).$use(async (params, next) => {
+    this['$use'](async (params, next) => {
       // Convertir DELETE en UPDATE con deletedAt
       if (params.action === 'delete') {
         params.action = 'update';
