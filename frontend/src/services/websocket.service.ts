@@ -45,12 +45,20 @@ class WebSocketService {
     private socket: Socket | null = null;
     private isConnecting = false;
     private reconnectAttempts = 0;
-    private maxReconnectAttempts = 5;
+    private maxReconnectAttempts = 1; // Reduced to 1 to stop retrying if WebSocket is not available
     private reconnectDelay = 1000; // 1 segundo
     private listeners = new Map<WebSocketEventType, Set<(data: unknown) => void>>();
+    private disabled = false; // Flag to disable WebSocket if not available
 
     private get API_URL(): string {
         return import.meta.env.VITE_API_URL || 'https://backend-production-6ce5a.up.railway.app';
+    }
+
+    /**
+     * Check if WebSocket is enabled
+     */
+    isEnabled(): boolean {
+        return !this.disabled;
     }
 
     /**
@@ -58,6 +66,11 @@ class WebSocketService {
      */
     connect(options: WebSocketConnectOptions = {}): Promise<Socket> {
         const { userId, token, autoConnect = true } = options;
+
+        // Si WebSocket está deshabilitado, rechazar inmediatamente
+        if (this.disabled) {
+            return Promise.reject(new Error('WebSocket is disabled'));
+        }
 
         // Si ya está conectado, retornar el socket existente
         if (this.socket?.connected) {
@@ -107,16 +120,19 @@ class WebSocketService {
                     console.log('[WebSocket] Connected:', this.socket?.id);
                     this.isConnecting = false;
                     this.reconnectAttempts = 0;
+                    this.disabled = false; // Re-enable on successful connection
                     resolve(this.socket!);
                 });
 
                 this.socket.on('connect_error', (error) => {
-                    console.error('[WebSocket] Connection error:', error);
+                    console.warn('[WebSocket] Connection error - real-time features unavailable');
                     this.isConnecting = false;
                     this.reconnectAttempts++;
 
                     if (this.reconnectAttempts >= this.maxReconnectAttempts) {
-                        console.error('[WebSocket] Max reconnect attempts reached');
+                        // Disable WebSocket after max attempts to stop retrying
+                        this.disabled = true;
+                        console.warn('[WebSocket] Real-time features disabled - server does not support WebSocket');
                         reject(error);
                     }
                 });
