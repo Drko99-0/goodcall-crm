@@ -2,7 +2,6 @@ import { NestFactory } from '@nestjs/core';
 import { ValidationPipe, Logger } from '@nestjs/common';
 import { AppModule } from './app.module';
 import { ConfigService } from '@nestjs/config';
-import { SocketAdapter } from './common/adapters/socket.adapter';
 
 async function bootstrap() {
   const logger = new Logger('Bootstrap');
@@ -28,9 +27,6 @@ async function bootstrap() {
     origin: origins,
     credentials: true,
   });
-
-  // WebSocket adapter personalizado para Railway
-  app.useWebSocketAdapter(new SocketAdapter(app));
 
   // Global prefix for all routes
   app.setGlobalPrefix('api');
